@@ -55,4 +55,4 @@ node_modules/**
 /.clasprc.json
 
 #Variables de entorno
-/env.gs
+env.gs
