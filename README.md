@@ -1,4 +1,4 @@
-# FormForm 3.0. Automated activity promotion generator
+# FormForm 3.0: Automated activity promotion generator
 
 ### Description
 
