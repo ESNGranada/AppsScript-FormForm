@@ -2,14 +2,11 @@
 //1. Cambiar IDs de las plantillas correspondientes en Drive
 //2. Ejecutar funcion obtenerPermisos
 
-const ID_PLANTILLA_DIA="1jw2CClQIdDWcjp0wHJaKTvBKjDonebp9vUeOcwkWHo0"
-const ID_PLANTILLA_NOCHE="1oxJwZLbXbS94i3XDM3icxPNAf7pJpSmXXBT_9cmxRT0"
-const ID_CARPETA="1KvLTPLS2UQ2_j8vArrAg3Kk9h0hxliez"                    //Se usará para guardar las historias en una carpeta concreta
-
 function obtenerPermisos(){
   MailApp.getRemainingDailyQuota();
   DriveApp.getStorageLimit();
   FormApp.getActiveForm();
+  SpreadsheetApp.flush();
 }
 
 function onFormSubmit(e) {
@@ -25,7 +22,7 @@ function onFormSubmit(e) {
   var fecha = formatearFecha(fechaPura);
 
   // 3. Generamos la historia de instagram y la guardamos en un archivo de imagen
-  var imagen = generarImagenHistoria(titulo, tipoActividad, hora, fecha, ubicacion, fechaPura);
+  var imagen = generarImagenHistoria(titulo, grupo, hora, fecha, ubicacion, fechaPura);
 
   // 4. Generamos los mensajes de Whatsapp en español e inglés
   var mensajes = generarMensajesWhatsapp(titulo, descripcion, fecha, hora, ubicacion, precio, dl_entradas, material, info);
@@ -36,9 +33,9 @@ function onFormSubmit(e) {
   enviarCorreo(email, imagen, mensajes);
 }
 
-function generarImagenHistoria(titulo, tipoActividad, hora, fecha, ubicacion, fechaPura){
+function generarImagenHistoria(titulo, grupoTrabajo, hora, fecha, ubicacion, fechaPura, debug = false){
   var carpeta = DriveApp.getFolderById(ID_CARPETA);
-  var plantilla = DriveApp.getFileById(tipoActividad === "Diurna"? ID_PLANTILLA_DIA : ID_PLANTILLA_NOCHE);
+  var plantilla = DriveApp.getFileById(ID_PLANTILLA);
 
   var copiaPlantilla = plantilla.makeCopy();
   var idCopiaPlantilla = copiaPlantilla.getId();
@@ -46,10 +43,12 @@ function generarImagenHistoria(titulo, tipoActividad, hora, fecha, ubicacion, fe
   var diapositiva = presentacion.getSlides()[0];
 
   var cadenaFecha = fecha[1].toUpperCase() + " " + fecha[2] + "" + fecha[3].toUpperCase();
+  var color = COLORES_GRUPOS[grupoTrabajo];
   
-  diapositiva.getPageElements()[1].asShape().getText().getTextStyle().setFontSize(calcularTamFuente(titulo.length, 1, 92));
-  diapositiva.getPageElements()[3].asShape().getText().getTextStyle().setFontSize(calcularTamFuente(cadenaFecha.length, 0.1, 74));
-  diapositiva.getPageElements()[4].asShape().getText().getTextStyle().setFontSize(calcularTamFuente(ubicacion.length + 20, 1, 80));
+  diapositiva.getPageElements()[1].asShape().getFill().setSolidFill(color,0.4);
+  diapositiva.getPageElements()[3].asShape().getText().getTextStyle().setFontSize(calcularTamFuente(titulo.length + 15, 1, 72));
+  diapositiva.getPageElements()[5].asShape().getText().getTextStyle().setFontSize(calcularTamFuente(cadenaFecha.length, 0.1, 60));
+  diapositiva.getPageElements()[6].asShape().getText().getTextStyle().setFontSize(calcularTamFuente(ubicacion.length + 15, 1, 60));
 
   diapositiva.replaceAllText("{{nombre_actividad}}", titulo.toUpperCase());
   diapositiva.replaceAllText("{{hora}}", hora);
@@ -64,9 +63,9 @@ function generarImagenHistoria(titulo, tipoActividad, hora, fecha, ubicacion, fe
   const blob = UrlFetchApp.fetch(url).getAs(MimeType.PNG);
 
   var fechaSemana = obtenerLunes(fechaPura);
-  var nombreCarpetaSemanal = "Semana " + fechaSemana;
+  var nombreCarpetaSemanal = debug?"Prueba":"Semana " + fechaSemana;
   var diaSemana = obtenerDiaSemana(fechaPura);
-  var letra = tipoActividad === "Diurna"? 'A' : 'B';
+  var letra = "A";//tipoActividad === "Diurna"? 'A' : 'B';
 
   var carpetaSemanal = checkIfFolderExistElseCreate(carpeta, nombreCarpetaSemanal);
 
@@ -75,6 +74,10 @@ function generarImagenHistoria(titulo, tipoActividad, hora, fecha, ubicacion, fe
   copiaPlantilla.setTrashed(true);
 
   return archivo;
+}
+
+function buscarImagen(titulo, grupo){
+
 }
 
 function generarMensajesWhatsapp(titulo, descripcion, fecha, hora, ubicacion, precio, dl_entradas, material, info){
