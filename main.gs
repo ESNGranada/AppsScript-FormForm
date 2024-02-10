@@ -1,12 +1,14 @@
-//Integración del FormForm 3.0. Pasos:
-//1. Cambiar IDs de las plantillas correspondientes en Drive
-//2. Ejecutar funcion obtenerPermisos
+//FormForm 3.0 Installation. Steps:
+//1. Change Drive templates/folders IDs in env.gs
+//2. Run function obtenerPermisos() from Apps Script
+//3. Create a new activator for the onFormSubmit function, whenever a form is submitted 
 
 function obtenerPermisos(){
   MailApp.getRemainingDailyQuota();
   DriveApp.getStorageLimit();
   FormApp.getActiveForm();
   SpreadsheetApp.flush();
+  CalendarApp.getTimeZone();
 }
 
 function onFormSubmit(e) {
@@ -21,13 +23,14 @@ function onFormSubmit(e) {
   //Formateamos la fecha
   var fecha = formatearFecha(fechaPura);
 
+  //Obtenemos las etiquetas de las imagenes para asignar una imagen ideal a la historia
+  cargarEtiquetas();
+
   // 3. Generamos la historia de instagram y la guardamos en un archivo de imagen
   var imagen = generarImagenHistoria(titulo, grupo, hora, fecha, ubicacion, fechaPura);
 
   // 4. Generamos los mensajes de Whatsapp en español e inglés
   var mensajes = generarMensajesWhatsapp(titulo, descripcion, fecha, hora, ubicacion, precio, dl_entradas, material, info);
-
-  console.log(mensajes);
 
   // 5. Enviar la historia y los mensajes al correo del coordi
   enviarCorreo(email, imagen, mensajes);
@@ -44,7 +47,12 @@ function generarImagenHistoria(titulo, grupoTrabajo, hora, fecha, ubicacion, fec
 
   var cadenaFecha = fecha[1].toUpperCase() + " " + fecha[2] + "" + fecha[3].toUpperCase();
   var color = COLORES_GRUPOS[grupoTrabajo];
+  var imagen = buscarImagen(titulo, ubicacion);
   
+  if(imagen){
+    diapositiva.getPageElements()[0].asImage().replace(imagen);
+  }
+
   diapositiva.getPageElements()[1].asShape().getFill().setSolidFill(color,0.4);
   diapositiva.getPageElements()[3].asShape().getText().getTextStyle().setFontSize(calcularTamFuente(titulo.length + 15, 1, 72));
   diapositiva.getPageElements()[5].asShape().getText().getTextStyle().setFontSize(calcularTamFuente(cadenaFecha.length, 0.1, 60));
@@ -63,7 +71,7 @@ function generarImagenHistoria(titulo, grupoTrabajo, hora, fecha, ubicacion, fec
   const blob = UrlFetchApp.fetch(url).getAs(MimeType.PNG);
 
   var fechaSemana = obtenerLunes(fechaPura);
-  var nombreCarpetaSemanal = debug?"Prueba":"Semana " + fechaSemana;
+  var nombreCarpetaSemanal = debug?"Prueba2.0":"Semana " + fechaSemana;
   var diaSemana = obtenerDiaSemana(fechaPura);
   var letra = "A";//tipoActividad === "Diurna"? 'A' : 'B';
 
@@ -71,13 +79,50 @@ function generarImagenHistoria(titulo, grupoTrabajo, hora, fecha, ubicacion, fec
 
   var archivo = carpetaSemanal.createFile(blob.setName(`${diaSemana}${letra}_${fecha}_${titulo}.png`));
 
-  copiaPlantilla.setTrashed(true);
+  var carpetaEditables = checkIfFolderExistElseCreate(carpeta, "Editables");
+  copiaPlantilla.setName(`${diaSemana}${letra}_${fecha}_${titulo}`);
+  copiaPlantilla.moveTo(carpetaEditables);
 
   return archivo;
 }
 
-function buscarImagen(titulo, grupo){
+function buscarImagen(titulo, ubicacion){
+  var keywords = (titulo + " " + ubicacion).toLowerCase().split(/[\s,\/]+/);
+  var mejoresImagenes = [];
+  var maximoCoincidencias = 0; 
 
+  for(var idImagen in ETIQUETAS_IMAGENES) {
+    var labels = ETIQUETAS_IMAGENES[idImagen].split(/[\s,]+/);
+    var coincidencias = keywords.filter(v => labels.includes(v)).length;
+
+    if(coincidencias > 0){
+      if(coincidencias > maximoCoincidencias){
+        mejoresImagenes = [];
+        maximoCoincidencias = coincidencias;
+        mejoresImagenes.push(idImagen);
+      }else if(coincidencias === maximoCoincidencias){
+        mejoresImagenes.push(idImagen);
+      }
+    }
+  }
+
+  const randomIndex = Math.floor(Math.random() * mejoresImagenes.length);
+  const imageFile = mejoresImagenes.length !== 0 ? DriveApp.getFileById(mejoresImagenes[randomIndex]) : null;
+
+  return imageFile;
+}
+
+function cargarEtiquetas(){
+  var files = DriveApp.getFolderById(ID_CARPETA_IMAGENES).getFiles();
+  
+  while(files.hasNext()){
+    var image = files.next();
+
+    var idImagen = image.getId();
+    var descripcion = image.getDescription();
+
+    ETIQUETAS_IMAGENES[idImagen] = descripcion;
+  }
 }
 
 function generarMensajesWhatsapp(titulo, descripcion, fecha, hora, ubicacion, precio, dl_entradas, material, info){
@@ -121,10 +166,10 @@ function generarMensajesWhatsapp(titulo, descripcion, fecha, hora, ubicacion, pr
 
 function formatearFecha(fecha){
   var objetoFecha = new Date(fecha);
-
-  var diaSemana = Utilities.formatDate(objetoFecha, "GMT+1", "EEEE");
-  var mes = Utilities.formatDate(objetoFecha, "GMT+1", "MMMM");
-  var dia = Utilities.formatDate(objetoFecha, "GMT+1", "d");
+  var timeZone = CalendarApp.getTimeZone();
+  var diaSemana = Utilities.formatDate(objetoFecha, timeZone, "EEEE");
+  var mes = Utilities.formatDate(objetoFecha, timeZone, "MMMM");
+  var dia = Utilities.formatDate(objetoFecha, timeZone, "d");
   var sufijo;
 
   //Averiguar sufijo en inglés
